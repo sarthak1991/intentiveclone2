@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # coturn TURN Server
+  # ============================================================================
+  # Provides NAT traversal for WebRTC connections.
+  # Required for 20-40% of users behind restrictive firewalls.
+  #
+  # Resource Usage (Minimal):
+  # - CPU: 0.25-0.5 cores
+  # - Memory: 256-512MB RAM
+  # - Bandwidth: ~500 Mbps for 50 concurrent video users
+  #
+  # Environment Variables (.env required):
+  # - TURN_SERVER_URL: Domain or IP of TURN server
+  # - TURN_SECRET: HMAC secret for credential generation
+  # - TURN_EXTERNAL_IP: Public IP (or 'auto' for detection)
+  #
+  # To disable TURN (use STUN-only):
+  # - Do NOT start this service
+  # - Remove TURN_SERVER_URL and TURN_SECRET from .env
+  # - Application will fallback to Google public STUN servers
+  # ============================================================================
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: focusflow-turn
+    restart: unless-stopped
+
+    # Use host network for proper NAT traversal
+    # IMPORTANT: Do NOT use custom networks, breaks ICE candidate gathering
+    network_mode: host
+
+    # Resource limits (minimal for development)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+    # Environment variables for coturn configuration
+    environment:
+      # Basic TURN server configuration
+      - TURN_SERVER_NAME=${TURN_SERVER_URL:-turn.focusflow.com}
+      - TURN_PORT=3478
+      - TURN_TLS_PORT=5349
+
+      # REST API for dynamic credential generation
+      # Matches FocusFlow's server-side credential generation
+      - TURN_REST_API_ENABLED=true
+      - TURN_SECRET=${TURN_SECRET:-change-this-secret-in-production}
+
+      # Network configuration
+      # Set to 'auto' for automatic detection, or set to public IP
+      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP:-auto}
+
+      # Logging configuration
+      - TURN_LOG_FILE=/var/log/coturn.log
+      - TURN_LOG_LEVEL=INFO
+
+      # Additional security options
+      - TURN_DISABLE_CLI_OPT=true
+      - TURN_DISABLE_CLI_SECRETS=true
+      - TURN_NO_TCP_RELAY=false
+      - TURN_PROD=true
+
+    # Volume mounts
+    volumes:
+      # Persist TURN logs
+      - ./turn-logs:/var/log/coturn
+
+    # Health check to verify TURN server is running
+    healthcheck:
+      test: ["CMD", "turnserver", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Labels for metadata
+    labels:
+      - "com.focusflow.service=turn"
+      - "com.focusflow.description=WebRTC TURN server for NAT traversal"
+      - "com.focusflow.ports=3478/tcp,3478/udp,5349/tcp,5349/udp"
+
+# ============================================================================
+# Networks
+# ============================================================================
+# Note: coturn uses network_mode: host for proper NAT traversal
+# Do NOT add custom networks for this service
+# ============================================================================
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  turn-logs:
+    driver: local

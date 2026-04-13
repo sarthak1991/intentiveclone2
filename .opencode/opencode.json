@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      "/Users/sarthakbatra/Documents/new_dev/intentiveclone2/.opencode/get-shit-done/*": "allow"
+    },
+    "external_directory": {
+      "/Users/sarthakbatra/Documents/new_dev/intentiveclone2/.opencode/get-shit-done/*": "allow"
+    }
+  }
+}
